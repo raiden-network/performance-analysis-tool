@@ -1,0 +1,93 @@
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <style>
+        .collapsible {
+            background-color: #777;
+            color: white;
+            cursor: pointer;
+            width: 90px;
+            border: none;
+            text-align: center;
+            outline: none;
+            font-size: 15px;
+        }
+
+        .active,
+        .collapsible:hover {
+            background-color: #555;
+        }
+
+        .content {
+            display: none;
+            overflow: hidden;
+            background-color: #f1f1f1;
+        }
+    </style>
+</head>
+
+<body>
+    {{ gantt_div }}
+    <table style="font-family: Arial, Helvetica, sans-serif; padding: 0px 0px 0px 50px">
+        <tr>
+            <td valign="top" align="left">
+                <h3>Notes</h3>
+                <div>
+                    <ul>
+                        <li>Tasks are grouped by their ID and may have subtasks (e.g. the actual API calls)</li>
+                        <li>Some tasks may have a very short duration which makes them almost invisible</li>
+                        <li>Hover over the start or end of a task to get more information</li>
+                        <li>Request and Response of subtasks are grouped together and visible in the tooltips</li>
+                    </ul>
+                </div>
+            </td>
+        </tr>
+        <tr>
+            <td colspan="2">
+                <div>
+                    <h3>Tasks</h3>
+                    <table style="font-family: Arial, Helvetica, sans-serif" width="1680">
+                        <tr>
+                            <th align="left" style="width:40px">ID</th>
+                            <th align="left" style="width:200px">Type</th>
+                            <th align="left" style="width:140px">Duration</th>
+                            <th align="left" style="width:1150px">Description</th>
+                        </tr>
+                        {% for item in task_table %}
+                        <tr>
+                            <td valign="top"><b>{{item.id}}</b></td>
+                            <td valign="top">{{item.type}}</td>
+                            <td valign="top">{{item.duration}}</td>
+                            <td valign="top">
+                                <button class="collapsible">Show</button>
+                                <pre class="content" style="width:1150px;overflow:auto">{{item.description}}</pre>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </table>
+                </div>
+            </td>
+        </tr>
+    </table>
+    <script>
+        var coll = document.getElementsByClassName("collapsible");
+        var i;
+
+        for (i = 0; i < coll.length; i++) {
+            coll[i].addEventListener("click", function () {
+                this.classList.toggle("active");
+                var content = this.nextElementSibling;
+                if (content.style.display === "block") {
+                    this.innerHTML = "Show";
+                    content.style.display = "none";
+                } else {
+                    this.innerHTML = "Hide";
+                    content.style.display = "block";
+                }
+            });
+        }
+    </script>
+</body>
+
+</html>
