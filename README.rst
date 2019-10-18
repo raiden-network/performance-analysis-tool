@@ -56,7 +56,7 @@ Mediated-Transfers-Scenario
 
 Limitations/Caveats
 ^^^^^^^^^^^^^^^^^^^
-- the duration of a task is done by looking at the next event in the list of events (sorted by time)
-- parallel task processing might not be visualized correctly
-- the number of ticks on the y-axis can be too much when too many tasks have been emitted in the log. In that case uncomment the ``showticklabels`` line within the ``draw_gantt()`` method.
+- the duration of a task is calculated by looking at the next event in the list of events (sorted by time)
+- tasks processed in parallel may not be visualized correctly
+- the number of ticks on the y-axis can be too high when too many tasks have been emitted in the log. In that case uncomment the ``showticklabels`` line within the ``draw_gantt()`` method.
 - log messages are grouped by task-id, resulting in request/response calls being grouped
