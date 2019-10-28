@@ -9,6 +9,11 @@ Prerequisites
 We strongly recommend using a virtual python env like `pyenv <https://github.com/pyenv/pyenv>`_
 (in addition to that you can use `virtualenvwrapper <https://github.com/virajkanwade/venvwrapper>`_)
 
+- Scenario-player
+
+The `Scenario-player <https://github.com/raiden-network/scenario-player>`_  and scenario-player logs 
+are a prerequisite to using this tool.
+
 Installation
 ^^^^^^^^^^^^
 
