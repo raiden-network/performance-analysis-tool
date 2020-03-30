@@ -3,16 +3,18 @@ import csv
 import gzip
 import json
 import os
+import re
 from argparse import Namespace
 from datetime import datetime, timedelta
 from glob import glob
 from itertools import groupby
-from typing import Any, Dict, List, NamedTuple, Tuple
+from typing import Any, Dict, List, NamedTuple, Tuple, Optional, Match
 
 import numpy as np
 import plotly.figure_factory as ff
 import plotly.graph_objs as go
 import plotly.offline as py
+import requests
 import yaml
 from jinja2 import Environment, FileSystemLoader
 
@@ -23,6 +25,53 @@ DEFAULT_RAW_STATS_FILENAME = "raw_stats.json"
 
 
 LOGGER_DATE_FMT = "%Y-%m-%d %H:%M:%S.%f"
+REPORT_STUB = {
+    "text": "Example message",
+}
+
+
+REPORT_HOOK_URL = "https://chat.brainbot.com/hooks/"
+
+
+DEFAULT_INCLUDE = "^Transfer.*|.*ChannelTask$|DepositTask$|.*MS.*|.*PFS.*"
+
+
+def filter_report(
+    report: List[Dict[str, Any]], include: str = DEFAULT_INCLUDE,
+) -> List[Dict[str, Any]]:
+    expression = re.compile(include)
+
+    def flt(e: Dict[str, Any]) -> Optional[Match[str]]:
+        return expression.match(e["name"])
+
+    return list(filter(flt, report,))
+
+
+def post_report(report: List[Dict[str, Any]], url: str) -> None:
+    message = REPORT_STUB.copy()
+    message["text"] = json_list_to_md_table(filter_report(report))
+    requests.post(url, json=message)
+
+
+def safe_format_number(value: Any) -> str:
+    result = value
+    try:
+        if "." in value:
+            result = f"{float(value):.04}"
+    except ValueError:
+        pass
+    finally:
+        return str(result)
+
+
+def json_list_to_md_table(data: List[Dict[str, Any]]) -> str:
+    keys = data[0].keys()
+    result = []
+    result.append("|".join(keys))
+    result.append("|".join("---" for _ in keys))
+    for entry in data:
+        result.append("|".join(safe_format_number(entry[k]) for k in keys))
+    return "\n".join(result)
 
 
 class Content(NamedTuple):
@@ -60,7 +109,7 @@ def read_raw_content(input_file: str) -> Tuple[List[Content], str]:
     # sort by timestamp
     stripped_content.sort(key=lambda e: e[0])
 
-    return stripped_content, f"node_{run_number}_*/*.log*"
+    return stripped_content, str(run_number)
 
 
 def draw_gantt(
@@ -128,7 +177,7 @@ def generate_statistics(filled_rows: Dict[str, List[Any]]) -> List[Dict[str, Any
     return group_by_result
 
 
-def write_statistics(output_directory: str, summary: List[Dict[str, Any]]) -> None:
+def write_statistics(output_directory: str, summary: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     raw_stats: List[Dict[str, Any]] = []
     for num, result in enumerate(summary):
         data_array = np.array((result["raw_durations"]))
@@ -162,6 +211,7 @@ def write_statistics(output_directory: str, summary: List[Dict[str, Any]]) -> No
 
     with open(f"{output_directory}/{DEFAULT_RAW_STATS_FILENAME}", "w") as f:
         json.dump(raw_stats, f, indent=2)
+    return raw_stats
 
 
 def open_node_logs(node_log_glob: str) -> List[str]:
@@ -243,14 +293,6 @@ def parse_args() -> Namespace:
     parser.add_argument(
         "input_file", nargs="*", help="File name of scenario-player log file as main input",
     )
-    parser.add_argument(
-        "--output-directory",
-        type=str,
-        dest="output_directory",
-        default="raiden-scenario-player-analysis",
-        help="Output directory name",
-    )
-
     args = parser.parse_args()
 
     return args
@@ -259,20 +301,27 @@ def parse_args() -> Namespace:
 def main() -> None:
     args = parse_args()
 
-    stripped_content, nodes_glob = read_raw_content(args.input_file[0])
+    stripped_content, run_number = read_raw_content(args.input_file[0])
 
     log_path = os.path.dirname(args.input_file[0])
 
-    node_logs = open_node_logs(os.path.join(log_path, nodes_glob))
+    node_logs = open_node_logs(os.path.join(log_path, f"node_{run_number}_*/*.log*"))
     filled_rows = fill_rows(stripped_content, node_logs)
     summary = generate_statistics(filled_rows)
+    output_directory = os.path.join(log_path, f"analysis_{run_number}")
 
-    if not os.path.exists(args.output_directory):
-        os.makedirs(args.output_directory)
+    if not os.path.exists(output_directory):
+        os.makedirs(output_directory)
 
-    draw_gantt(args.output_directory, filled_rows, summary)
-    write_csv(args.output_directory, filled_rows)
-    write_statistics(args.output_directory, summary)
+    draw_gantt(output_directory, filled_rows, summary)
+    write_csv(output_directory, filled_rows)
+    raw_stats: List[Dict[str, Any]] = write_statistics(output_directory, summary)
+
+    secret = os.environ.get("RC_HOOK_SECRET")
+    if secret is None:
+        raise SystemExit("Can't publish report. Please define 'RC_HOOK_SECRET' in environment!")
+    url = REPORT_HOOK_URL + secret
+    post_report(raw_stats, url)
 
 
 if __name__ == "__main__":
