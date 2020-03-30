@@ -60,8 +60,7 @@ def safe_format_number(value: Any) -> str:
             result = f"{float(value):.04}"
     except ValueError:
         pass
-    finally:
-        return str(result)
+    return str(result)
 
 
 def json_list_to_md_table(data: List[Dict[str, Any]]) -> str:
