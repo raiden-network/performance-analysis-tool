@@ -310,8 +310,7 @@ def main() -> None:
     summary = generate_statistics(filled_rows)
     output_directory = os.path.join(log_path, f"analysis_{run_number}")
 
-    if not os.path.exists(output_directory):
-        os.makedirs(output_directory)
+    os.makedirs(output_directory, exist_ok=True)
 
     draw_gantt(output_directory, filled_rows, summary)
     write_csv(output_directory, filled_rows)
