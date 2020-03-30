@@ -65,9 +65,10 @@ def safe_format_number(value: Any) -> str:
 
 def json_list_to_md_table(data: List[Dict[str, Any]]) -> str:
     keys = data[0].keys()
-    result = []
-    result.append("|".join(keys))
-    result.append("|".join("---" for _ in keys))
+    result = [
+        "|".join(keys),
+        "|".join("---" for _ in keys),
+    ]
     for entry in data:
         result.append("|".join(safe_format_number(entry[k]) for k in keys))
     return "\n".join(result)
