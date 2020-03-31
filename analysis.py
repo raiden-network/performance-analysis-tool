@@ -47,9 +47,11 @@ def filter_report(
     return list(filter(flt, report,))
 
 
-def post_report(report: List[Dict[str, Any]], url: str) -> None:
+def post_report(report: List[Dict[str, Any]], logfile: str, url: str) -> None:
     message = REPORT_STUB.copy()
-    message["text"] = json_list_to_md_table(filter_report(report))
+    text = f"###### Stats for {logfile.rsplit('/', 1)[-1]}\n"
+    text += json_list_to_md_table(filter_report(report))
+    message["text"] = text
     requests.post(url, json=message)
 
 
@@ -210,7 +212,7 @@ def write_statistics(output_directory: str, summary: List[Dict[str, Any]]) -> Li
         text_file.write(output_content)
 
     with open(f"{output_directory}/{DEFAULT_RAW_STATS_FILENAME}", "w") as f:
-        json.dump(raw_stats, f, indent=2)
+        json.dump(raw_stats, f)
     return raw_stats
 
 
@@ -244,7 +246,7 @@ def fill_rows(content: List[Content], node_logs: List[str]) -> Dict[str, List[An
         task_body = task.json["task"].split(":", 1)
         task_type = task_body[0].replace("<", "").strip()
         task_desc = task_body[1].replace(">", "").strip()
-        task_body_json = yaml.safe_load(task_desc.replace("'", '"'))
+        task_body_json = yaml.safe_load(task_desc)
 
         # Skip WaitTask
         if not isinstance(task_body_json, dict):
@@ -257,7 +259,7 @@ def fill_rows(content: List[Content], node_logs: List[str]) -> Dict[str, List[An
             nodes_involved = count_log_occurrences(str(task_body_json["identifier"]), node_logs)
 
         if nodes_involved:
-            task_type = f"{task_type}({nodes_involved} hops)"
+            task_type = f"{task_type}({nodes_involved} node{nodes_involved > 1 and 's' or ''})"
 
         # add main task to rows
         task_body_json["nodes_involved"] = nodes_involved
@@ -320,7 +322,7 @@ def main() -> None:
     if secret is None:
         raise SystemExit("Can't publish report. Please define 'RC_HOOK_SECRET' in environment!")
     url = REPORT_HOOK_URL + secret
-    post_report(raw_stats, url)
+    post_report(raw_stats, args.input_file[0], url)
 
 
 if __name__ == "__main__":
