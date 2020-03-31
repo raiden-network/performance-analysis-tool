@@ -244,7 +244,7 @@ def fill_rows(content: List[Content], node_logs: List[str]) -> Dict[str, List[An
         task_body = task.json["task"].split(":", 1)
         task_type = task_body[0].replace("<", "").strip()
         task_desc = task_body[1].replace(">", "").strip()
-        task_body_json = yaml.safe_load(task_desc.replace("'", '"'))
+        task_body_json = yaml.safe_load(task_desc)
 
         # Skip WaitTask
         if not isinstance(task_body_json, dict):
