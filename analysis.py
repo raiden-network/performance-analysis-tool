@@ -259,7 +259,7 @@ def fill_rows(content: List[Content], node_logs: List[str]) -> Dict[str, List[An
             nodes_involved = count_log_occurrences(str(task_body_json["identifier"]), node_logs)
 
         if nodes_involved:
-            task_type = f"{task_type}({nodes_involved} hops)"
+            task_type = f"{task_type}({nodes_involved} node{nodes_involved > 1 and 's' or ''})"
 
         # add main task to rows
         task_body_json["nodes_involved"] = nodes_involved
