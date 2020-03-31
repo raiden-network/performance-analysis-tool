@@ -210,7 +210,7 @@ def write_statistics(output_directory: str, summary: List[Dict[str, Any]]) -> Li
         text_file.write(output_content)
 
     with open(f"{output_directory}/{DEFAULT_RAW_STATS_FILENAME}", "w") as f:
-        json.dump(raw_stats, f, indent=2)
+        json.dump(raw_stats, f)
     return raw_stats
 
 
