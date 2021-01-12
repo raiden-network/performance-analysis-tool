@@ -1,4 +1,5 @@
 import argparse
+import sys
 import csv
 import gzip
 import json
@@ -63,6 +64,12 @@ def safe_format_number(value: Any) -> str:
     except ValueError:
         pass
     return str(result)
+
+def post_empty(logfile: str, url: str) -> None:
+    message = {
+        "text": f"No output for {logfile.rsplit('/', 1)[-1]}\n"
+    }
+    requests.post(url, json=message)
 
 
 def json_list_to_md_table(data: List[Dict[str, Any]]) -> str:
@@ -301,9 +308,17 @@ def parse_args() -> Namespace:
 
 
 def main() -> None:
+    secret = os.environ.get("RC_HOOK_SECRET")
+    if secret is None:
+        raise SystemExit("Can't publish report. Please define 'RC_HOOK_SECRET' in environment!")
+    url = REPORT_HOOK_URL + secret
+
     args = parse_args()
 
     stripped_content, run_number = read_raw_content(args.input_file[0])
+    if not stripped_content or not run_number:
+        post_empty(args.input_file[0], url)
+        sys.exit(0)
 
     log_path = os.path.dirname(args.input_file[0])
 
@@ -318,10 +333,6 @@ def main() -> None:
     write_csv(output_directory, filled_rows)
     raw_stats: List[Dict[str, Any]] = write_statistics(output_directory, summary)
 
-    secret = os.environ.get("RC_HOOK_SECRET")
-    if secret is None:
-        raise SystemExit("Can't publish report. Please define 'RC_HOOK_SECRET' in environment!")
-    url = REPORT_HOOK_URL + secret
     post_report(raw_stats, args.input_file[0], url)
 
 
