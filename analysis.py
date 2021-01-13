@@ -19,6 +19,8 @@ import requests
 import yaml
 from jinja2 import Environment, FileSystemLoader
 
+from prometheus import parse_filled_rows
+
 DEFAULT_GANTT_FILENAME = "gantt-overview.html"
 DEFAULT_CSV_FILENAME = "durations.csv"
 DEFAULT_STATISTICS_FILENAME = "statistics.html"
@@ -318,7 +320,14 @@ def main() -> None:
         raise SystemExit("Can't publish report. Please define 'RC_HOOK_SECRET' in environment!")
     url = REPORT_HOOK_URL + secret
 
+    PROMETHEUS_NODE_EXPORTER_PATH = os.environ.get(
+        "PROMETHEUS_NODE_EXPORTER_PATH", "/tmp/nodexporter.txt"
+    )
+
     args = parse_args()
+    scenario_name = (
+        args.input_file[0].rsplit("/", 1)[-1].split("-")[2].split("_", 1)[-1].rsplit("_", 1)[0]
+    )
 
     stripped_content, run_number = read_raw_content(args.input_file[0])
     if not stripped_content or not run_number:
@@ -329,6 +338,7 @@ def main() -> None:
 
     node_logs = open_node_logs(os.path.join(log_path, f"node_{run_number}_*/*.log*"))
     filled_rows = fill_rows(stripped_content, node_logs)
+    parse_filled_rows(filled_rows, scenario_name, PROMETHEUS_NODE_EXPORTER_PATH)
     summary = generate_statistics(filled_rows)
     output_directory = os.path.join(log_path, f"analysis_{run_number}")
 
