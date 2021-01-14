@@ -4,11 +4,12 @@ import gzip
 import json
 import os
 import re
+import sys
 from argparse import Namespace
 from datetime import datetime, timedelta
 from glob import glob
 from itertools import groupby
-from typing import Any, Dict, List, NamedTuple, Tuple, Optional, Match
+from typing import Any, Dict, List, Match, NamedTuple, Optional, Tuple
 
 import numpy as np
 import plotly.figure_factory as ff
@@ -37,14 +38,20 @@ DEFAULT_INCLUDE = "^Transfer.*|.*ChannelTask$|DepositTask$|.*MS.*|.*PFS.*"
 
 
 def filter_report(
-    report: List[Dict[str, Any]], include: str = DEFAULT_INCLUDE,
+    report: List[Dict[str, Any]],
+    include: str = DEFAULT_INCLUDE,
 ) -> List[Dict[str, Any]]:
     expression = re.compile(include)
 
     def flt(e: Dict[str, Any]) -> Optional[Match[str]]:
         return expression.match(e["name"])
 
-    return list(filter(flt, report,))
+    return list(
+        filter(
+            flt,
+            report,
+        )
+    )
 
 
 def post_report(report: List[Dict[str, Any]], logfile: str, url: str) -> None:
@@ -63,6 +70,11 @@ def safe_format_number(value: Any) -> str:
     except ValueError:
         pass
     return str(result)
+
+
+def post_empty(logfile: str, url: str) -> None:
+    message = {"text": f"No output for {logfile.rsplit('/', 1)[-1]}\n"}
+    requests.post(url, json=message)
 
 
 def json_list_to_md_table(data: List[Dict[str, Any]]) -> str:
@@ -93,8 +105,8 @@ def read_raw_content(input_file: str) -> Tuple[List[Content], str]:
     content: List[str] = []
 
     if input_file.endswith("gz"):
-        with gzip.open(input_file, "r") as f:
-            content = [line.strip().decode() for line in f.readlines()]
+        with gzip.open(input_file, "r") as fz:
+            content = [line.strip().decode() for line in fz.readlines()]
     else:
         with open(input_file, "r") as f:
             content = [line.strip() for line in f.readlines()]
@@ -114,9 +126,7 @@ def read_raw_content(input_file: str) -> Tuple[List[Content], str]:
     return stripped_content, str(run_number)
 
 
-def draw_gantt(
-    output_directory: str, filled_rows: Dict[str, List[Any]], summary: List[Dict[str, Any]]
-) -> None:
+def draw_gantt(output_directory: str, filled_rows: Dict[str, List[Any]]) -> None:
     fig = ff.create_gantt(
         filled_rows["gantt_rows"],
         title="Raiden Analysis",
@@ -174,7 +184,7 @@ def generate_statistics(filled_rows: Dict[str, List[Any]]) -> List[Dict[str, Any
         result["stdev"] = data.std()
         result["count"] = data.size
         group_by_result.append(result)
-        print
+        print()
 
     return group_by_result
 
@@ -220,8 +230,8 @@ def open_node_logs(node_log_glob: str) -> List[str]:
     node_logs = []
     for fn in glob(node_log_glob):
         if fn.endswith("gz"):
-            with gzip.open(fn, "r") as file:
-                node_logs.append(file.read().decode())
+            with gzip.open(fn, "r") as zfile:
+                node_logs.append(zfile.read().decode())
         else:
             with open(fn, "r") as file:
                 node_logs.append(file.read())
@@ -293,7 +303,9 @@ def fill_rows(content: List[Content], node_logs: List[str]) -> Dict[str, List[An
 def parse_args() -> Namespace:
     parser = argparse.ArgumentParser(description="Raiden Scenario-Player Analysis")
     parser.add_argument(
-        "input_file", nargs="*", help="File name of scenario-player log file as main input",
+        "input_file",
+        nargs="*",
+        help="File name of scenario-player log file as main input",
     )
     args = parser.parse_args()
 
@@ -301,9 +313,17 @@ def parse_args() -> Namespace:
 
 
 def main() -> None:
+    secret = os.environ.get("RC_HOOK_SECRET")
+    if secret is None:
+        raise SystemExit("Can't publish report. Please define 'RC_HOOK_SECRET' in environment!")
+    url = REPORT_HOOK_URL + secret
+
     args = parse_args()
 
     stripped_content, run_number = read_raw_content(args.input_file[0])
+    if not stripped_content or not run_number:
+        post_empty(args.input_file[0], url)
+        sys.exit(0)
 
     log_path = os.path.dirname(args.input_file[0])
 
@@ -314,14 +334,10 @@ def main() -> None:
 
     os.makedirs(output_directory, exist_ok=True)
 
-    draw_gantt(output_directory, filled_rows, summary)
+    draw_gantt(output_directory, filled_rows)
     write_csv(output_directory, filled_rows)
     raw_stats: List[Dict[str, Any]] = write_statistics(output_directory, summary)
 
-    secret = os.environ.get("RC_HOOK_SECRET")
-    if secret is None:
-        raise SystemExit("Can't publish report. Please define 'RC_HOOK_SECRET' in environment!")
-    url = REPORT_HOOK_URL + secret
     post_report(raw_stats, args.input_file[0], url)
 
 
