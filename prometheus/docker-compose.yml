@@ -1,0 +1,63 @@
+version: '3.8'
+
+x-log-config: &log-config
+  logging:
+    driver: json-file
+    options:
+      max-size: "20m"
+      max-file: "10"
+
+services:
+  node_exporter:
+    env_file: .env
+    image: quay.io/prometheus/node-exporter:latest
+    container_name: node_exporter
+    command:
+      - '--path.rootfs=/host'
+      - '--collector.textfile.directory=/data/'
+    network_mode: host
+    pid: host
+    restart: unless-stopped
+    volumes:
+      - /:/host:ro,rslave
+      - ${DATA_DIR:-./data}/performance-analysis:/data:ro
+    << : *log-config
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.metrics_node.rule=Host(`metrics.node.${SERVER_NAME}`)"
+      - "traefik.http.routers.metrics_node.tls=true"
+      - "traefik.http.routers.metrics_node.tls.certresolver=le"
+      - "traefik.http.routers.metrics_node.middlewares=metrics_node-access-control@docker"
+      - "traefik.http.middlewares.metrics_node-access-control.ipwhitelist.sourcerange=${CIDR_ALLOW_METRICS}"
+
+
+  traefik:
+    image: traefik:2.2
+    restart: always
+    env_file: .env
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - traefik:/etc/traefik
+      - ${DATA_DIR:-./data}/traefik:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: --certificatesResolvers.le.acme.email=contact@raiden.network
+    healthcheck:
+      disable: true
+    << : *log-config
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik.rule=Host(`proxy.${SERVER_NAME}`)"
+      - "traefik.http.routers.traefik.tls=true"
+      - "traefik.http.routers.traefik.tls.certresolver=le"
+      - "traefik.http.routers.traefik.service=api@internal"
+      - "traefik.http.routers.traefik.entrypoints=websecure"
+      - "traefik.http.routers.traefik.middlewares=traefik-access-control@docker"
+      - "traefik.http.routers.traefik-metrics.rule=Host(`proxy.${SERVER_NAME}`) && PathPrefix(`/metrics`)"
+      - "traefik.http.routers.traefik-metrics.tls=true"
+      - "traefik.http.routers.traefik-metrics.tls.certresolver=le"
+      - "traefik.http.routers.traefik-metrics.service=prometheus@internal"
+      - "traefik.http.routers.traefik-metrics.entrypoints=websecure"
+      - "traefik.http.routers.traefik-metrics.middlewares=traefik-access-control@docker"
+      - "traefik.http.middlewares.traefik-access-control.ipwhitelist.sourcerange=${CIDR_ALLOW_METRICS}"

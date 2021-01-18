@@ -1,0 +1,33 @@
+[log]
+  level = "INFO"
+
+[accessLog]
+
+[entryPoints]
+  [entryPoints.web]
+    address = ":80"
+    [entryPoints.web.http.redirections]
+      [entryPoints.web.http.redirections.entryPoint]
+        to = "websecure"
+  [entryPoints.websecure]
+    address = ":443"
+
+[api]
+  dashboard = true
+
+[providers.docker]
+  watch = true
+  exposedByDefault = false
+
+[certificatesResolvers.le.acme]
+  storage = "/data/acme.json"
+
+  [certificatesResolvers.le.acme.httpChallenge]
+    entryPoint = "web"
+
+[metrics]
+  [metrics.prometheus]
+    addEntryPointsLabels = true
+    addServicesLabels = true
+    manualRouting = true
+
