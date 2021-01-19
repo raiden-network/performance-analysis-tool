@@ -1,4 +1,4 @@
-version: '3.8'
+version: '2.3'
 
 x-log-config: &log-config
   logging:
@@ -10,12 +10,11 @@ x-log-config: &log-config
 services:
   node_exporter:
     env_file: .env
-    image: quay.io/prometheus/node-exporter:latest
+    image: quay.io/prometheus/node-exporter:v1.0.1
     container_name: node_exporter
     command:
       - '--path.rootfs=/host'
       - '--collector.textfile.directory=/data/'
-    network_mode: host
     pid: host
     restart: unless-stopped
     volumes:
@@ -24,12 +23,12 @@ services:
     << : *log-config
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.metrics_node.rule=Host(`metrics.node.${SERVER_NAME}`)"
+      - "traefik.http.routers.metrics_node.rule=Host(`metrics.${SERVER_NAME}`)"
       - "traefik.http.routers.metrics_node.tls=true"
       - "traefik.http.routers.metrics_node.tls.certresolver=le"
       - "traefik.http.routers.metrics_node.middlewares=metrics_node-access-control@docker"
       - "traefik.http.middlewares.metrics_node-access-control.ipwhitelist.sourcerange=${CIDR_ALLOW_METRICS}"
-
+      - "traefik.http.services.metrics_node.loadbalancer.server.port=9100"
 
   traefik:
     image: traefik:2.2
@@ -46,18 +45,3 @@ services:
     healthcheck:
       disable: true
     << : *log-config
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.traefik.rule=Host(`proxy.${SERVER_NAME}`)"
-      - "traefik.http.routers.traefik.tls=true"
-      - "traefik.http.routers.traefik.tls.certresolver=le"
-      - "traefik.http.routers.traefik.service=api@internal"
-      - "traefik.http.routers.traefik.entrypoints=websecure"
-      - "traefik.http.routers.traefik.middlewares=traefik-access-control@docker"
-      - "traefik.http.routers.traefik-metrics.rule=Host(`proxy.${SERVER_NAME}`) && PathPrefix(`/metrics`)"
-      - "traefik.http.routers.traefik-metrics.tls=true"
-      - "traefik.http.routers.traefik-metrics.tls.certresolver=le"
-      - "traefik.http.routers.traefik-metrics.service=prometheus@internal"
-      - "traefik.http.routers.traefik-metrics.entrypoints=websecure"
-      - "traefik.http.routers.traefik-metrics.middlewares=traefik-access-control@docker"
-      - "traefik.http.middlewares.traefik-access-control.ipwhitelist.sourcerange=${CIDR_ALLOW_METRICS}"

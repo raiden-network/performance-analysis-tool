@@ -24,10 +24,3 @@
 
   [certificatesResolvers.le.acme.httpChallenge]
     entryPoint = "web"
-
-[metrics]
-  [metrics.prometheus]
-    addEntryPointsLabels = true
-    addServicesLabels = true
-    manualRouting = true
-
