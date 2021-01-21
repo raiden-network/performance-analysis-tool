@@ -302,6 +302,29 @@ def fill_rows(content: List[Content], node_logs: List[str]) -> Dict[str, List[An
     return filled_rows
 
 
+def parse_client_versions(node_stdout_glob: str) -> List[Dict[str, str]]:
+    clients = []
+    for fn in glob(node_stdout_glob):
+        client = dict()
+        with open(fn, "r") as f:
+            for line in f.readlines():
+                if "Command line" in line:
+                    js = "lc" in line.split()[2]
+                    if js:
+                        client = {
+                            "implementation": "js",
+                            "version": "unknown",
+                        }
+                    else:
+                        client["implementation"] = "py"
+                if "Welcome to Raiden" in line:
+                    client["version"] = line.split()[4].strip("!")
+                if "implementation" in client and "version" in client:
+                    clients.append(client)
+                    break
+    return clients
+
+
 def parse_args() -> Namespace:
     parser = argparse.ArgumentParser(description="Raiden Scenario-Player Analysis")
     parser.add_argument(
@@ -337,8 +360,11 @@ def main() -> None:
     log_path = os.path.dirname(args.input_file[0])
 
     node_logs = open_node_logs(os.path.join(log_path, f"node_{run_number}_*/*.log*"))
+    client_versions = parse_client_versions(
+        os.path.join(log_path, f"node_{run_number}_*/*.stdout")
+    )
     filled_rows = fill_rows(stripped_content, node_logs)
-    parse_filled_rows(filled_rows, scenario_name, PROMETHEUS_NODE_EXPORTER_PATH)
+    parse_filled_rows(filled_rows, scenario_name, client_versions, PROMETHEUS_NODE_EXPORTER_PATH)
     summary = generate_statistics(filled_rows)
     output_directory = os.path.join(log_path, f"analysis_{run_number}")
 
