@@ -8,7 +8,7 @@ Jinja2==2.11.3
 jsonschema==3.0.1
 jupyter-core==4.4.0
 nbformat==4.4.0
-numpy==1.16.3
+numpy==1.21.0
 plotly==3.9.0
 pyrsistent==0.15.2
 pytz==2019.1
